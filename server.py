@@ -45,6 +45,7 @@ current_http_server_port = DEFAULT_HTTP_SERVER_PORT
 current_websocket_server_port = DEFAULT_WEBSOCKET_SERVER_PORT
 target_file = None
 target_directory = None
+running_server_info = None
 
 websocket_shutdown_event = threading.Event()
 
@@ -169,6 +170,8 @@ def run_http_server(hostname:str) -> bool:
 def start_http_server():
 	global http_server_thread
 	global http_server
+	global running_server_info
+	
 	if http_server is None:
 		http_server = prepare_http_server(HTTP_SERVER_HOSTNAME, DEFAULT_HTTP_SERVER_PORT)
 		http_server_thread = threading.Thread(target=run_http_server, args=(HTTP_SERVER_HOSTNAME,))
@@ -178,6 +181,8 @@ def start_http_server():
 		print("websocket server started")
 		start_monitoring_files()
 		print("file observer started")
+
+		running_server_info.set(f"Server running at http://{HTTP_SERVER_HOSTNAME}:{current_http_server_port}")
 	else:
 		print("http server already started")
 
@@ -187,6 +192,7 @@ def stop_http_server():
 	global file_observer_thread
 	global websocket_server
 	global websocket_server_thread
+	global running_server_info
 
 	if http_server is not None:
 		http_server.shutdown()
@@ -203,6 +209,7 @@ def stop_http_server():
 		print("file observer stopped")
 		del file_observer_thread
 		file_observer_thread = None
+		running_server_info.set(f"Server is stopped.")
 	else:
 		print("server is not running")
 
@@ -277,13 +284,13 @@ async def send_websocket_message(websocket:ServerConnection):
 				message = "reload"
 			elif file_created_event.is_set():
 				file_created_event.clear()
-				message = "file created"
+				pass
 			elif file_moved_event.is_set():
 				file_moved_event.clear()
-				message = "file moved"
+				pass
 			elif file_deleted_event.is_set():
 				file_deleted_event.clear()
-				message = "file deleted"
+				pass
 			
 			if message is not None:
 				await websocket.send(message)
@@ -374,6 +381,11 @@ def main():
 
 	target_file_label = Label(window, textvariable=target_file)
 	target_file_label.grid(column=1, row=2, columnspan=14)
+	
+	global running_server_info
+	running_server_info = StringVar(value="Server is stopped")
+	current_server_label = Label(window, textvariable=running_server_info)
+	current_server_label.grid(column=1, row=5, columnspan=14)
 
 	window.after(100, check_events)
 	window.mainloop()
